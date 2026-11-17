@@ -1,9 +1,7 @@
 name: Facebook Auto Poster
 
 on:
-  schedule:
-    - cron: '0 0,6,12,18 * * *' 
-  workflow_dispatch: 
+  workflow_dispatch: # ده معناه إن الكود مستني إشارة تشغيل خارجية أو يدوية
 
 jobs:
   post:
@@ -28,6 +26,7 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
           FB_PAGE_TOKEN: ${{ secrets.FB_PAGE_TOKEN }}
           FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
         run: python bot.py
