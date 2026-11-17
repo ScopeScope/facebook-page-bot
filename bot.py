@@ -22,9 +22,38 @@ def save_to_history(topic):
     with open(HISTORY_FILE, "a", encoding="utf-8") as f:
         f.write(f"{topic}\n")
 
-def generate_content(history_list):
+def get_latest_gemini_model():
+    """دالة مضادة لتحديثات جوجل: بتجيب أحدث موديل نصوص أياً كان اسمه"""
     genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel('gemini-2.5-flash')
+    text_models = []
+    
+    # 1. بنسحب كل الموديلات اللي بتدعم توليد النصوص
+    for m in genai.list_models():
+        if 'generateContent' in m.supported_generation_methods:
+            text_models.append(m.name)
+            
+    if not text_models:
+        return "models/gemini-1.5-flash" # خط دفاع أخير لو السيرفر واقع
+        
+    text_models.sort() # بنرتبهم عشان الأحدث يكون في الآخر
+    
+    # الخطة أ: لو لسه بيستخدموا اسم فلاش
+    flash_models = [m for m in text_models if 'flash' in m]
+    if flash_models:
+        return flash_models[-1]
+        
+    # الخطة ب: لو غيروا الاسم لـ برو
+    pro_models = [m for m in text_models if 'pro' in m]
+    if pro_models:
+        return pro_models[-1]
+        
+    # الخطة ج: لو غيروا الأسامي كلها، هنختار أحدث موديل في القايمة
+    return text_models[-1]
+
+def generate_content(history_list):
+    latest_model_name = get_latest_gemini_model()
+    print(f"Using Gemini Model: {latest_model_name}")
+    model = genai.GenerativeModel(latest_model_name)
     
     history_str = ", ".join(history_list[-30:]) 
     
