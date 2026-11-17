@@ -3,9 +3,10 @@ import json
 import requests
 import google.generativeai as genai
 
-# إعداد المتغيرات من GitHub Secrets
+# إعداد المتغيرات
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 PEXELS_API_KEY = os.environ.get("PEXELS_API_KEY")
+PIXABAY_API_KEY = os.environ.get("PIXABAY_API_KEY")
 FB_PAGE_TOKEN = os.environ.get("FB_PAGE_TOKEN")
 FB_PAGE_ID = os.environ.get("FB_PAGE_ID")
 
@@ -25,7 +26,7 @@ def generate_content(history_list):
     genai.configure(api_key=GEMINI_API_KEY)
     model = genai.GenerativeModel('gemini-2.5-flash')
     
-    history_str = ", ".join(history_list[-30:]) # نبعت آخر 30 موضوع عشان منستهلكش التوكنز
+    history_str = ", ".join(history_list[-30:]) 
     
     prompt = f"""
     أنت صانع محتوى لصفحة فيسبوك علمية شيقة اسمها "ما وراء المعلومة".
@@ -46,21 +47,33 @@ def generate_content(history_list):
     """
     
     response = model.generate_content(prompt)
-    
-    # تنظيف الرد لو فيه علامات Markdown
     json_text = response.text.strip().replace('```json', '').replace('```', '')
     return json.loads(json_text)
 
 def get_pexels_image(query):
+    if not PEXELS_API_KEY: return None
     headers = {"Authorization": PEXELS_API_KEY}
     url = f"https://api.pexels.com/v1/search?query={query}&per_page=1"
-    res = requests.get(url, headers=headers).json()
-    if res.get("photos"):
-        return res["photos"][0]["src"]["large"]
-    return None # لو ملقاش صورة
+    try:
+        res = requests.get(url, headers=headers).json()
+        if res.get("photos"):
+            return res["photos"][0]["src"]["large"]
+    except:
+        pass
+    return None
+
+def get_pixabay_image(query):
+    if not PIXABAY_API_KEY: return None
+    url = f"https://pixabay.com/api/?key={PIXABAY_API_KEY}&q={query}&image_type=photo&per_page=3"
+    try:
+        res = requests.get(url).json()
+        if res.get("hits"):
+            return res["hits"][0]["largeImageURL"]
+    except:
+        pass
+    return None
 
 def post_to_facebook(message, image_url):
-    # استخدام Photos API للنشر بصورة
     url = f"https://graph.facebook.com/v18.0/{FB_PAGE_ID}/photos"
     payload = {
         "url": image_url,
@@ -83,13 +96,19 @@ def main():
     print(f"Topic: {topic}")
     print(f"Searching image for: {keyword}")
     
+    # المحاولة في Pexels أولاً
     image_url = get_pexels_image(keyword)
     
-    # لو Pexels ملقاش صورة، هينشر البوست كنص فقط على نقطة نهاية Feed
+    # لو ملقاش، يحاول في Pixabay
+    if not image_url:
+        print("الصورة غير موجودة في Pexels، جاري البحث في Pixabay...")
+        image_url = get_pixabay_image(keyword)
+    
+    # النشر
     if image_url:
         post_to_facebook(message, image_url)
     else:
-        print("لم يتم العثور على صورة، جاري نشر نص فقط...")
+        print("لم يتم العثور على صورة في الموقعين، جاري نشر نص فقط...")
         text_url = f"https://graph.facebook.com/v18.0/{FB_PAGE_ID}/feed"
         requests.post(text_url, data={"message": message, "access_token": FB_PAGE_TOKEN})
         
